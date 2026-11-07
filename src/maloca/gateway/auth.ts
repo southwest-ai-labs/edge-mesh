@@ -44,10 +44,17 @@ async function hmacSha256(
 	return new Uint8Array(sig);
 }
 
-// Secreto para JWT
-const JWT_SECRET = new TextEncoder().encode(
-	"maloca-gateway-default-secret-change-me",
-);
+// Secreto dinámico para JWT
+export function getJwtSecret(): Uint8Array {
+	const envSecret = typeof process !== "undefined" ? process.env?.MALOCA_JWT_SECRET : undefined;
+	if (envSecret && envSecret.trim().length >= 16) {
+		return new TextEncoder().encode(envSecret.trim());
+	}
+	if (typeof process !== "undefined" && process.env?.NODE_ENV === "production") {
+		throw new Error("MALOCA_JWT_SECRET must be configured in production with at least 16 characters");
+	}
+	return new TextEncoder().encode("maloca-gateway-dev-ephemeral-secret-v1");
+}
 
 export const authRateLimiter = new TokenBucketRateLimiter({
 	tokensPerInterval: 3,
@@ -103,7 +110,7 @@ export async function generateJWT(profileId: string): Promise<string> {
 	);
 
 	const hmacResult = await hmacSha256(
-		JWT_SECRET,
+		getJwtSecret(),
 		new TextEncoder().encode(`${headerEncoded}.${payloadEncoded}`),
 	);
 	const signatureEncoded = base64url(hmacResult);
@@ -121,7 +128,7 @@ export async function verifyToken(token: string): Promise<boolean> {
 		const [header, payload, signature] = parts;
 
 		const hmacResult = await hmacSha256(
-			JWT_SECRET,
+			getJwtSecret(),
 			new TextEncoder().encode(`${header}.${payload}`),
 		);
 		const expectedSignature = base64url(hmacResult);

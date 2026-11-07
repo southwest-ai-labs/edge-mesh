@@ -1,6 +1,7 @@
 import type { EdgeMesh } from "../../edge-mesh.js";
 import { TokenBucketRateLimiter } from "../../security/rate-limiter.js";
 import type { Envolvente } from "../../types/index.js";
+import { getProfileFromToken, verifyToken } from "./auth.js";
 
 /**
  * WebSocket Gateway para tiempo real en el mesh Maloca.
@@ -22,7 +23,7 @@ export class MalocaWSGateway extends EventTarget {
 	/**
 	 * Conecta un cliente WS al mesh.
 	 */
-	async connectWS(profileId: string, clientIp = "127.0.0.1") {
+	async connectWS(profileId: string, clientIp = "127.0.0.1", token?: string) {
 		if (!this.rateLimiter.consume(clientIp)) {
 			console.warn(
 				`Rate limit exceeded for IP: ${clientIp} on Gateway WS connect`,
@@ -33,6 +34,13 @@ export class MalocaWSGateway extends EventTarget {
 				}),
 			);
 			throw new Error("Rate limit exceeded: 429");
+		}
+
+		if (token) {
+			const isValid = await verifyToken(token);
+			if (!isValid) throw new Error("Unauthorized: Invalid gateway token");
+			const authedProfile = await getProfileFromToken(token);
+			if (authedProfile !== profileId) throw new Error("Forbidden: Profile ID mismatch");
 		}
 		console.log(`WS Client connected: ${profileId}`);
 

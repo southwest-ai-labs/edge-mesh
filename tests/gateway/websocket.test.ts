@@ -26,6 +26,11 @@ describe("MalocaWSGateway", () => {
 		wsGateway.subscribeToEvents("profile-1", ["sync", "chat"]);
 	});
 
+	it("should reject connection with invalid token", async () => {
+		await expect(wsGateway.connectWS("profile-1", "127.0.0.1", "bad.jwt.token"))
+			.rejects.toThrow("Unauthorized: Invalid gateway token");
+	});
+
 	it("should emit messages to mesh", async () => {
 		const transmitirSpy = vi
 			.spyOn(mesh, "transmitir")
